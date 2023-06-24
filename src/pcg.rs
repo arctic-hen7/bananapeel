@@ -35,7 +35,7 @@ impl Pcg {
     pub fn from_seed(init_state: u64, init_seq: u64) -> Self {
         let mut pcg = Pcg {
             state: 0,
-            inc: (init_seq << 1) | 1
+            inc: (init_seq << 1) | 1,
         };
         pcg.next();
         pcg.state = u64::wrapping_add(pcg.state, init_state);

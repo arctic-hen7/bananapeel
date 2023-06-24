@@ -1,7 +1,7 @@
 mod pcg;
 
-use base64::{Engine, engine::general_purpose::STANDARD_NO_PAD};
-use getrandom::getrandom;
+use base64::{engine::general_purpose::STANDARD_NO_PAD, DecodeError as Base64DecodeError, Engine};
+use hex::FromHexError;
 use pcg::Pcg;
 
 /// The number of hexadecimal characters it takes to represent an unsigned 64-bit integer.
@@ -78,7 +78,8 @@ impl Bananapeel {
         let noise_len = supplemental_rng.next() % max_noise_len as u64;
         // We turn the maximum chance into a number as a threshold; if a later random number is less than this threshold,
         // that will be skipped
-        let value_skip_threshold = supplemental_rng.next() % (u64::MAX as f64 * self.max_value_skip_chance) as u64;
+        let value_skip_threshold =
+            supplemental_rng.next() % (u64::MAX as f64 * self.max_value_skip_chance) as u64;
 
         // 1. Encode the input as base64
         let base64_encoded = STANDARD_NO_PAD.encode(input);
@@ -86,7 +87,8 @@ impl Bananapeel {
         // 2. Encode that as hexadecimal
         let hex_encoded = hex::encode(base64_encoded);
         // 3. Partition into strings of length `partition_len`
-        let mut partitions = self.split_into_partitions(&hex_encoded, noise_len as usize, &mut supplemental_rng);
+        let mut partitions =
+            self.split_into_partitions(&hex_encoded, noise_len as usize, &mut supplemental_rng);
         // 4. Create a PRNG that is deterministic based on its seed
         let rng_seed = Pcg::new_seed();
         let mut rng = Pcg::from_seed(rng_seed.0, rng_seed.1);
@@ -121,16 +123,55 @@ impl Bananapeel {
 
         (partitions, key)
     }
-    // /// Decodes the given message chunks using the given key. It is important to make sure that the options used for decoding
-    // /// are the same as those used for encoding, as this function only performs basic sanity checks on this! Attempting to decode
-    // /// with difference values to those used for encoding will lead to garbled output. The exception here is the `value_skip_chance`
-    // /// property, which does not need to be known (and ideally should be kept secret).
-    // ///
-    // /// **IMPORTANT:** Unlike many encryption algorithms, decoding a message using an invalid key will lead to one of two occurrences:
-    // /// either an infinite loop or
-    // pub fn decode(partitions: &[&str], key: Key) -> String {
+    /// Decodes the given message chunks using the given key. It is important to make sure that the options used for decoding
+    /// are the same as those used for encoding, as this function only performs basic sanity checks on this! Attempting to decode
+    /// with difference values to those used for encoding will lead to garbled output. The exception here is the `value_skip_chance`
+    /// property, which does not need to be known (and ideally should be kept secret).
+    ///
+    /// **IMPORTANT:** Unlike many encryption algorithms, decoding a message using an invalid key will lead to one of two occurrences:
+    /// either an infinite loop or garbled output. The former is more likely to occur because the output of the PRNG that is used as
+    /// an ordering source will likely be unique for small (i.e. not in the hundreds of millions) numbers of chunks, so most outputs
+    /// will simply not be found, leading the decoder to continue polling the PRNG indefinitely. Therefore, it is generally recommended
+    /// that a time limit be placed on this function to prevent it from blocking the environment in which it is executed.
+    pub fn decode(partitions: &mut [&str], key: Key) -> Result<String, DecodeError> {
+        // 1. Re-seed the PRNG to use as a generator function
+        let mut rng = Pcg::from_seed(key.rng_init_state, key.rng_init_seq);
+        // 2. Going through the outputs of the generator, order the partitions according to the outputs of the generator (trying to find each one)
+        let mut next_idx = 0; // The next index to find
+        while next_idx < partitions.len() {
+            let order_prefix = rng.next();
+            let formatted_order_prefix = format!("{:016x}", order_prefix);
+            // NOTE: Not worth searching among those we've already parsed obviously
+            for i in next_idx..partitions.len() {
+                if partitions[i].starts_with(&formatted_order_prefix) {
+                    // Strip off the order prefix and the noise
+                    let data = partitions[i].strip_prefix(&formatted_order_prefix).unwrap();
+                    let data = &data[key.noise_len as usize..];
+                    partitions[i] = &data;
+                    // Now move that partition to the index we want it at
+                    partitions.swap(i, next_idx);
+                    next_idx += 1;
+                }
+            }
+        }
+        // 3. Reverse the hex encoding
+        let hex = partitions.join("");
+        // If there are an odd number of characters, we padded, so get rid of the last character until we handle the padding properly in
+        // the base64 (otherwise we'll get an error)
+        let hex = if hex.len() % 2 != 0 {
+            &hex[0..hex.len() - 1]
+        } else {
+            hex.as_str()
+        };
+        let base64 = hex::decode(hex)?;
+        // 4. Remove the base 64 padding added to make the chunks even
+        let base64_unpadded = &base64[0..key.base64_len as usize];
+        // 5. Decode the base 64
+        let decoded = STANDARD_NO_PAD.decode(base64_unpadded)?;
+        let decoded_str = String::from_utf8(decoded).unwrap(); // This should never fail
 
-    // }
+        Ok(decoded_str)
+    }
 
     /// Splits the given input into chunks of the appropriate partition size. This will perform padding, so this process is only reliably reversible
     /// if the length of the input string is known.
@@ -179,15 +220,53 @@ impl Bananapeel {
     }
 }
 
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum DecodeError {
+    #[error(transparent)]
+    HexDecodeError(#[from] FromHexError),
+    #[error(transparent)]
+    Base64DecodeError(#[from] Base64DecodeError),
+}
+
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use crate::Bananapeel;
 
     #[test]
     fn encoding_works() {
         let bp = Bananapeel::default_sha256();
-        let (encoded, key) = bp.encode("Hello, world!");
+        let msg = include_str!("../lorem.txt");
+
+        let before_encode = Instant::now();
+        let (encoded, key) = bp.encode(msg);
+        let after_encode = Instant::now();
+
+        for chunk in &encoded {
+            assert_eq!(chunk.len(), 64);
+        }
         println!("Key: {:#?}", key);
-        println!("Encoded data: {:#?}", encoded);
+        std::fs::write("lorem_encoded.txt", encoded.join("\n")).unwrap();
+
+        let mut encoded_slice = encoded.iter().map(|x| x.as_str()).collect::<Vec<_>>();
+
+        let before_decode = Instant::now();
+        let decoded = Bananapeel::decode(encoded_slice.as_mut_slice(), key);
+        let after_decode = Instant::now();
+
+        assert!(decoded.is_ok());
+        assert_eq!(decoded.unwrap(), msg);
+
+        println!(
+            "Time to encode: {}ms",
+            after_encode.duration_since(before_encode).as_millis()
+        ); // ~4ms
+        println!(
+            "Time to decode: {}ms",
+            after_decode.duration_since(before_decode).as_millis()
+        ); // Highly dependent on noise length!
     }
 }
