@@ -6,6 +6,43 @@
 use getrandom::getrandom;
 
 /// A permuted congruential generator, implemented as an infinite generator.
+// Note that this has been validated using the following C code (adapted from the reference implementation by Melissa O'Neil):
+//
+// ```c
+// #include <inttypes.h>
+// #include <stdio.h>
+//
+// typedef struct { uint64_t state;  uint64_t inc; } pcg32_random_t;
+//
+// uint32_t pcg32_random_r(pcg32_random_t* rng)
+// {
+//     uint64_t oldstate = rng->state;
+//     // Advance internal state
+//     rng->state = oldstate * 6364136223846793005ULL + (rng->inc|1);
+//     // Calculate output function (XSH RR), uses old state for max ILP
+//     uint32_t xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
+//     uint32_t rot = oldstate >> 59u;
+//     return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+// }
+//
+// void pcg32_srandom_r(pcg32_random_t* rng, uint64_t initstate, uint64_t initseq)
+// {
+//     rng->state = 0U;
+//     rng->inc = (initseq << 1u) | 1u;
+//     pcg32_random_r(rng);
+//     rng->state += initstate;
+//     pcg32_random_r(rng);
+// }
+//
+// int main() {
+//     pcg32_random_t rng = { 0, 0 };
+//     pcg32_srandom_r(&rng, 6237633766001211634U, 13929184729078426727U);
+
+//     printf("%u\n", pcg32_random_r(&rng));
+//     printf("%u\n", pcg32_random_r(&rng));
+//     printf("%u\n", pcg32_random_r(&rng));
+// }
+// ```
 pub struct Pcg {
     state: u64,
     inc: u64,
@@ -46,13 +83,15 @@ impl Pcg {
 
     /// Gets the next pseudorandom number that the generator will produce. This will mutate the internal state, and is not implemented
     /// as an [`Iterator`] because the sequence will never be exhausted.
-    pub fn next(&mut self) -> u64 {
-        let old_state = self.state;
-        self.state = u64::wrapping_add(u64::wrapping_mul(old_state, 6364136223846793005), self.inc);
-        let xorshifted = ((old_state >> 18) ^ old_state) >> 27;
-        let rot = old_state >> 59;
+    pub fn next(&mut self) -> u32 {
+        let oldstate = self.state;
+        self.state = oldstate
+            .wrapping_mul(6364136223846793005_u64)
+            .wrapping_add(self.inc | 1);
+        let xorshifted = (((oldstate >> 18) ^ oldstate) >> 27) as u32;
+        let rot = (oldstate >> 59) as i32;
 
-        (xorshifted >> rot) | (xorshifted << ((-(rot as i64)) & 31))
+        (xorshifted >> rot) | (xorshifted << ((-rot) & 31))
     }
 }
 

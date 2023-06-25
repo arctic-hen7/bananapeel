@@ -1,11 +1,11 @@
 mod pcg;
 
-use base64::{engine::general_purpose::STANDARD_NO_PAD, DecodeError as Base64DecodeError, Engine};
+use base64::{engine::general_purpose::URL_SAFE, DecodeError as Base64DecodeError, Engine};
 use hex::FromHexError;
 use pcg::Pcg;
 
-/// The number of hexadecimal characters it takes to represent an unsigned 64-bit integer.
-const U64_HEX_LENGTH: usize = 16;
+/// The number of hexadecimal characters it takes to represent an unsigned 32-bit integer (i.e. a PCG output).
+const U32_HEX_LENGTH: u32 = 8;
 
 /// A key that can be used to decode a BANANAPEEL-encoded message.
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub struct Key {
     /// The length of the input string when encoded as base64 (needed to remove padding).
     base64_len: u64,
     /// The number of noise characters in each chunk.
-    noise_len: u64,
+    noise_len: u32,
 }
 
 /// The options used to encode/decode messages with BANANAPEEL. Generally you can instantiate this however you like,
@@ -25,22 +25,22 @@ pub struct Key {
 /// three parts like so:
 ///
 /// ```text
-/// <order-prefix; 16><noise; noise_len><encoded_chunk; x>
+/// <order-prefix; 8><noise; noise_len><encoded_chunk; x>
 /// ```
 ///
-/// In other words, every chunk first has a 16-character order prefix, then some noise, and finally an encoded chunk
+/// In other words, every chunk first has a 8-character order prefix, then some noise, and finally an encoded chunk
 /// takes up the rest of the space. Hence, the number of characters of encoded data that will be in each chunk will be
-/// `output_len - noise_len - 16`, so you should be mindful to keep `noise_len` low enough that you do not end up with
+/// `output_len - noise_len - 8`, so you should be mindful to keep `noise_len` low enough that you do not end up with
 /// too many chunks.
 ///
 /// If you're unsure of how to initialise this manually, it is recommended that you use one of the pre-initialised options.
 pub struct Bananapeel {
     /// The length of each output string as a number of hexadecimal characters.
-    pub output_len: usize,
-    /// The minimum number of characters in each chunk to devote to actual data. Note that this must be less than `output_len - 16`,
-    /// since 16 characters are needed for the ordering prefixes. The actual number of noise characters will be randomly generated
+    pub output_len: u32,
+    /// The minimum number of characters in each chunk to devote to actual data. Note that this must be less than `output_len - 8`,
+    /// since 8 characters are needed for the ordering prefixes. The actual number of noise characters will be randomly generated
     /// to be less than this value, but it will be kept uniform across all the chunks.
-    pub min_data_in_chunk: usize,
+    pub min_data_in_chunk: u32,
     /// The maximum probability factor that a given order prefix from the PRNG will be skipped. This introduces a degree of
     /// randomness that makes certain attacks effectively impossible to implement, even with poor shuffling of the final
     /// output chunks. The actual probability factor will be randomly chosen to be some value less than or equal to this.
@@ -66,8 +66,8 @@ impl Bananapeel {
     /// input in base 64). and for other reasons of cryptographic security.
     pub fn encode(&self, input: &str) -> (Vec<String>, Key) {
         // Make sure we have enough space to actually do anything
-        assert!(self.output_len >= self.min_data_in_chunk + U64_HEX_LENGTH, "insufficient space for data in each chunk (please increase `output_len` or decrease `min_data_in_chunk`)");
-        let max_noise_len = self.output_len - self.min_data_in_chunk - U64_HEX_LENGTH;
+        assert!(self.output_len >= self.min_data_in_chunk + U32_HEX_LENGTH, "insufficient space for data in each chunk (please increase `output_len` or decrease `min_data_in_chunk`)");
+        let max_noise_len = self.output_len - self.min_data_in_chunk - U32_HEX_LENGTH;
 
         // Initialise a supplemental RNG to be used generally (*not* the generator function!)
         let mut supplemental_rng = {
@@ -75,20 +75,20 @@ impl Bananapeel {
             Pcg::from_seed(seed.0, seed.1)
         };
         // Decide how many noise characters to use and how often to skip values
-        let noise_len = supplemental_rng.next() % max_noise_len as u64;
+        let noise_len = supplemental_rng.next() % max_noise_len;
         // We turn the maximum chance into a number as a threshold; if a later random number is less than this threshold,
         // that will be skipped
         let value_skip_threshold =
-            supplemental_rng.next() % (u64::MAX as f64 * self.max_value_skip_chance) as u64;
+            supplemental_rng.next() % (u32::MAX as f64 * self.max_value_skip_chance) as u32;
 
         // 1. Encode the input as base64
-        let base64_encoded = STANDARD_NO_PAD.encode(input);
+        let base64_encoded = URL_SAFE.encode(input);
         let base64_len = base64_encoded.len() as u64;
         // 2. Encode that as hexadecimal
         let hex_encoded = hex::encode(base64_encoded);
         // 3. Partition into strings of length `partition_len`
         let mut partitions =
-            self.split_into_partitions(&hex_encoded, noise_len as usize, &mut supplemental_rng);
+            self.split_into_partitions(&hex_encoded, noise_len, &mut supplemental_rng);
         // 4. Create a PRNG that is deterministic based on its seed
         let rng_seed = Pcg::new_seed();
         let mut rng = Pcg::from_seed(rng_seed.0, rng_seed.1);
@@ -105,7 +105,7 @@ impl Bananapeel {
             };
             // We may need to pad the order prefix to make sure it takes up the correct number of characters
             let noise = self.gen_noise(&mut supplemental_rng, noise_len);
-            *partition = format!("{:016x}{}{}", order_prefix, noise, partition);
+            *partition = format!("{:08x}{}{}", order_prefix, noise, partition);
         }
         // 6. Shuffle the chunks (their ordering prefixes will preserve them if the key is known)
         // Inspired by `rand`'s `.shuffle()` method on slices
@@ -140,7 +140,7 @@ impl Bananapeel {
         let mut next_idx = 0; // The next index to find
         while next_idx < partitions.len() {
             let order_prefix = rng.next();
-            let formatted_order_prefix = format!("{:016x}", order_prefix);
+            let formatted_order_prefix = format!("{:08x}", order_prefix);
             // NOTE: Not worth searching among those we've already parsed obviously
             for i in next_idx..partitions.len() {
                 if partitions[i].starts_with(&formatted_order_prefix) {
@@ -167,7 +167,7 @@ impl Bananapeel {
         // 4. Remove the base 64 padding added to make the chunks even
         let base64_unpadded = &base64[0..key.base64_len as usize];
         // 5. Decode the base 64
-        let decoded = STANDARD_NO_PAD.decode(base64_unpadded)?;
+        let decoded = URL_SAFE.decode(base64_unpadded)?;
         let decoded_str = String::from_utf8(decoded).unwrap(); // This should never fail
 
         Ok(decoded_str)
@@ -178,10 +178,10 @@ impl Bananapeel {
     ///
     /// # Panics
     ///
-    /// This will panic if there is not enough space to place any characters in a given output chunk (i.e. if there is not more than a 16-character
+    /// This will panic if there is not enough space to place any characters in a given output chunk (i.e. if there is not more than a 8-character
     /// difference between `output_len` and `noise_len`).
-    fn split_into_partitions(&self, input: &str, noise_len: usize, rng: &mut Pcg) -> Vec<String> {
-        assert!(self.output_len - noise_len - U64_HEX_LENGTH > 0, "insufficient space to place characters in output chunks (please decrease noise or increase output length)");
+    fn split_into_partitions(&self, input: &str, noise_len: u32, rng: &mut Pcg) -> Vec<String> {
+        assert!(self.output_len - noise_len - U32_HEX_LENGTH > 0, "insufficient space to place characters in output chunks (please decrease noise or increase output length)");
 
         let mut chars = input.chars().collect::<Vec<_>>();
         // Pad the characters out to make sure we'll get the correct number of chunks (`.chunks_exact()` omits any remainder).
@@ -195,15 +195,15 @@ impl Bananapeel {
         }
 
         // As above, this will now have no remainder
-        let partition_len = self.output_len - noise_len - U64_HEX_LENGTH;
+        let partition_len = self.output_len - noise_len - U32_HEX_LENGTH;
         chars
-            .chunks_exact(partition_len)
+            .chunks_exact(partition_len as usize)
             .map(|chunk| chunk.iter().collect::<String>())
             .collect::<Vec<_>>()
     }
     /// Generates a certain number of "noise" characters using the given PRNG. Currently, this does not use a CSPRNG for speed, as it does not
     /// appear that one is needed, although that may change in future.
-    fn gen_noise(&self, rng: &mut Pcg, noise_len: u64) -> String {
+    fn gen_noise(&self, rng: &mut Pcg, noise_len: u32) -> String {
         let mut noise = String::new();
         for _ in 0..noise_len {
             let rand_char = Self::gen_rand_hex_char(rng);
@@ -232,9 +232,8 @@ pub enum DecodeError {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use crate::Bananapeel;
+    use std::time::Instant;
 
     #[test]
     fn encoding_works() {
