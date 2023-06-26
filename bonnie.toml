@@ -1,0 +1,9 @@
+version = "0.3.2"
+
+[scripts]
+test = "cargo test -- --nocapture"
+min-js = [
+    "uglifyjs bananapeel.js --mangle --mangle-props --output bananapeel.min.js",
+    # Make sure to add the license as well, since this will probably be distributed as a rogue file
+    "echo -e \"/*\n$(cat ./LICENSE)\n*/\n\n$(cat ./bananapeel.min.js)\" > bananapeel.min.js"
+]

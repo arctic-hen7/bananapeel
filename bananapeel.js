@@ -1,10 +1,6 @@
 // A decoder for the BANANAPEEL algorithm that can run in the browser. This is deliberately minimal, but it will decode any BANANAPEEL message produced
 // by a compliant encoder. Since this runs in an interpreted language, do NOT expect this to be fast!
 
-const partitions = [
-    "1547ec9bc9621cc1252513f30c81b8516f3d248579eda3a2f53ffeeaf98a8260",
-    "faae17a9f7d44142a650469b8131d3534756736247387349486476636d786b49"
-];
 const decoder = (key_str, partitions) => {
     // Convert the key string into an actual key
     const binary_key = atob(key_str);
@@ -77,4 +73,3 @@ const decoder = (key_str, partitions) => {
     // JS needs a base64 *string* in order to perform native decoding (expects URL-safe)
     return atob(base64_unpadded_str);
 }
-console.log(decoder("YPxSAaKqLtEW41n6r8XBIhQAAAAWAAAA", partitions))
