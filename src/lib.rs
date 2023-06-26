@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 mod pcg;
 
 use base64::{engine::general_purpose::URL_SAFE, DecodeError as Base64DecodeError, Engine};

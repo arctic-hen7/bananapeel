@@ -18,4 +18,4 @@ In general, it is best to use the Rust implementation if you can, as it will be 
 
 ## License
 
-See [`LICENSE`](LICENSE).
+See [`LICENSE`](./LICENSE).
