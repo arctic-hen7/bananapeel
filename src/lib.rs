@@ -8,16 +8,54 @@ use pcg::Pcg;
 const U32_HEX_LENGTH: u32 = 8;
 
 /// A key that can be used to decode a BANANAPEEL-encoded message.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Key {
     /// The initial state of the PCG random number generator.
     rng_init_state: u64,
     /// The initial sequence of the PCG random number generator.
     rng_init_seq: u64,
     /// The length of the input string when encoded as base64 (needed to remove padding).
-    base64_len: u64,
+    base64_len: u32,
     /// The number of noise characters in each chunk.
     noise_len: u32,
+}
+// BANANAPEEL keys can be represented as 32-character URL-safe base 64 strings.
+impl Into<String> for Key {
+    fn into(self) -> String {
+        // First, create a byte array
+        let mut bytes = Vec::with_capacity(8 + 8 + 4 + 4); // 2 64-bits and 2 32-bit
+        bytes.extend(self.rng_init_state.to_le_bytes());
+        bytes.extend(self.rng_init_seq.to_le_bytes());
+        bytes.extend(self.base64_len.to_le_bytes());
+        bytes.extend(self.noise_len.to_le_bytes());
+
+        // Now convert that to a base64 string
+        URL_SAFE.encode(bytes)
+    }
+}
+impl ToString for Key {
+    fn to_string(&self) -> String {
+        self.clone().into()
+    }
+}
+impl TryFrom<String> for Key {
+    type Error = base64::DecodeError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let bytes = URL_SAFE.decode(value)?;
+
+        let rng_init_state = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
+        let rng_init_seq = u64::from_le_bytes(bytes[8..16].try_into().unwrap());
+        let base64_len = u32::from_le_bytes(bytes[16..20].try_into().unwrap());
+        let noise_len = u32::from_le_bytes(bytes[20..24].try_into().unwrap());
+
+        Ok(Self {
+            rng_init_state,
+            rng_init_seq,
+            base64_len,
+            noise_len,
+        })
+    }
 }
 
 /// The options used to encode/decode messages with BANANAPEEL. Generally you can instantiate this however you like,
@@ -83,7 +121,7 @@ impl Bananapeel {
 
         // 1. Encode the input as base64
         let base64_encoded = URL_SAFE.encode(input);
-        let base64_len = base64_encoded.len() as u64;
+        let base64_len = base64_encoded.len() as u32;
         // 2. Encode that as hexadecimal
         let hex_encoded = hex::encode(base64_encoded);
         // 3. Partition into strings of length `partition_len`
@@ -232,7 +270,7 @@ pub enum DecodeError {
 
 #[cfg(test)]
 mod tests {
-    use crate::Bananapeel;
+    use crate::{pcg::Pcg, Bananapeel, Key};
     use std::time::Instant;
 
     #[test]
@@ -267,5 +305,26 @@ mod tests {
             "Time to decode: {}ms",
             after_decode.duration_since(before_decode).as_millis()
         ); // Highly dependent on noise length!
+    }
+
+    #[test]
+    fn encoding_key_works() {
+        // We'll generate a random key to make sure we can encode and decode many different things
+        let rng_seed = Pcg::new_seed();
+        let mut rng = Pcg::from_seed(rng_seed.0, rng_seed.1);
+        let mut rand_u64 = || (rng.next() as u64) << 32 | (rng.next() as u64);
+
+        for _ in 0..100 {
+            let key = Key {
+                rng_init_state: rand_u64(),
+                rng_init_seq: rand_u64(),
+                base64_len: rand_u64() as u32,
+                noise_len: rand_u64() as u32,
+            };
+            let encoded: String = key.clone().into();
+            let decoded_key = Key::try_from(encoded);
+            assert!(decoded_key.is_ok());
+            assert_eq!(key, decoded_key.unwrap());
+        }
     }
 }
