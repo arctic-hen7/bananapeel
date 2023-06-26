@@ -7,3 +7,9 @@ min-js = [
     # Make sure to add the license as well, since this will probably be distributed as a rogue file
     "echo -e \"/*\n$(cat ./LICENSE)\n*/\n\n$(cat ./bananapeel.min.js)\" > bananapeel.min.js"
 ]
+
+release = [
+    "standard-version --sign --commit-all %%",
+    "git push --follow-tags origin main",
+]
+publish = "cargo publish"

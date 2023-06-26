@@ -1,7 +1,7 @@
 // A decoder for the BANANAPEEL algorithm that can run in the browser. This is deliberately minimal, but it will decode any BANANAPEEL message produced
 // by a compliant encoder. Since this runs in an interpreted language, do NOT expect this to be fast!
 
-const decoder = (key_str, partitions) => {
+const bpDecode = (key_str, partitions) => {
     // Convert the key string into an actual key
     const binary_key = atob(key_str);
     const key_bytes = new Uint8Array(binary_key.length);
