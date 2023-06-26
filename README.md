@@ -6,6 +6,12 @@ Hence, not only does *Bananapeel* significantly obfuscate data to the point of i
 
 Of course, all that assumes an attacker could not simply reverse two basic encoding processes and attempt to fit the chunks together like a jigsaw puzzle, which is why it is highly recommended that *Bananapeel* be used to encode the ciphertext of a real encryption algorithm, being used itself merely as an obfuscation tool, and for the convenience of enabling encoded chunks to be transmitted in any order. Further, since *Bananapeel* uniquely requires a key for decoding, using it in a scenario where a decryption key would already be required is far simpler than in one where key transmission is infeasible.
 
+## Usage
+
+This repo contains a full Rust implementation of *Bananapeel*, the documentation for which is available [here](https://docs.rs/bananapeel), as well as a JavaScript implementation of a decoder *only*. Generally, you'll want to use the minified version, which is available in [`bananapeel.min.js`](bananapeel.min.js), and which exposes a single `bpDecode` function that takes a base64-encoded *Bananapeel* key as its first parameter, and an array of chunks as its second, returning the string message that was originally fed into *Bananapeel*.
+
+In general, it is best to use the Rust implementation if you can, as it will be much faster and is probably far less error-prone (mainly because Rust has sane integer management, as opposed to JS' rather incomprehensible 53-bit precision), however the JS implementation is provided for use-cases such as [Cyst](https://github.com/arctic-hen7/cyst), for which this algorithm was originally designed.
+
 ## Security
 
 *Bananapeel* is the result of a random thought that came to me while I was trying to obfuscate a Bash script, and has received no formal security audit whatsoever! If combined with a strong encryption algorithm, *Bananapeel* should not (to my limited knowledge) degrade the security of that algorithm, however it is not recommended to apply this algorithm to plaintext in any context in which security of any sort is required, as that would almost certainly end in tears.
