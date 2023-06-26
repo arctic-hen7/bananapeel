@@ -2,6 +2,13 @@
 name = "bananapeel"
 version = "0.1.0-rc.1"
 edition = "2021"
+description = "A darn-slippery obfuscator algorithm!"
+authors = ["arctic-hen7 <arctic.hen@pm.me>"]
+license = "MIT"
+repository = "https://github.com/arctic-hen7/bananapeel"
+readme = "README.md"
+keywords = [ "obfuscation", "encoding", "bananapeel" ]
+categories = [ "algorithms", "cryptography", "encoding" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
