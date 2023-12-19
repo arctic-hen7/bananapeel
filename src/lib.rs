@@ -288,6 +288,7 @@ mod tests {
             assert_eq!(chunk.len(), 64);
         }
         println!("Key: {:#?}", key);
+        println!("Key: {}", key.to_string());
         std::fs::write("lorem_encoded.txt", encoded.join("\n")).unwrap();
 
         let mut encoded_slice = encoded.iter().map(|x| x.as_str()).collect::<Vec<_>>();
