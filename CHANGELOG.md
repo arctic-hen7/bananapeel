@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.1-rc.1](/home/arctic-hen7/me/.main-mirror.git/compare/v0.1.0...v0.1.1-rc.1) (2023-12-19)
+
+
+### Features
+
+* added cli ([87a956c](/home/arctic-hen7/me/.main-mirror.git/commit/87a956c3a6c1d1ed3e58c030d3489601a625fdb8))
+* added minified python decoder ([acfd096](/home/arctic-hen7/me/.main-mirror.git/commit/acfd096e34834b978cd1ad799cf3a42ceb8e6f4a))
+* added python decoder ([cc519e0](/home/arctic-hen7/me/.main-mirror.git/commit/cc519e078bbd2c0df0293f7a8e64dcc476105fe9))
+
+
+### Code Refactorings
+
+* removed a few chars from `bananapeel.min.py` ([839067c](/home/arctic-hen7/me/.main-mirror.git/commit/839067c9aec3d74f8be7298aa820121c1a3e425b))
+
+
+### Documentation Changes
+
+* updated readme ([05b8324](/home/arctic-hen7/me/.main-mirror.git/commit/05b8324087b94a94ec7549d2cba04fc87aac2439))
+
 ## [0.1.0](https://github.com/arctic-hen7/bananapeel/compare/v0.1.0-rc.1...v0.1.0) (2023-06-26)
 
 ## 0.1.0-rc.1 (2023-06-26)
