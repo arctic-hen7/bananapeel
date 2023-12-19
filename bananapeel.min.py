@@ -33,7 +33,7 @@ import sys,base64 as J,struct as Q
 A=[A.strip()for A in sys.stdin.readlines()]
 F=dict(zip([L,M,N,O],Q.unpack('<QQII',J.b64decode(sys.argv[1])[:24])))
 B=lambda x,limit:x%(limit+1)
-def I(rng):C=rng;A=C[E];C[E]=B(A*0x5851f42d4c957f2d+(C[P]|1),0xffffffffffffffff);D=B((A>>18^A)>>27,4294967295);F=B(A>>59,4294967295);return B(D>>F|D<<(-F&31),4294967295)
+def I(r):C=r;A=C[E];C[E]=B(A*0x5851f42d4c957f2d+(C[P]|1),0xffffffffffffffff);D=B((A>>18^A)>>27,4294967295);F=B(A>>59,4294967295);return B(D>>F|D<<(-F&31),4294967295)
 D={E:0,P:B(F[M]<<1|1,0xffffffffffffffff)}
 I(D)
 D[E]=B(D[E]+F[L],0xffffffffffffffff)
