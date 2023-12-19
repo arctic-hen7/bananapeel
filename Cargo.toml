@@ -17,3 +17,9 @@ getrandom = "0.2"
 base64 = "0.21"
 hex = "0.4"
 thiserror = "1"
+clap = { version = "4", features = [ "derive" ] }
+fmterr = "0.1"
+
+[[bin]]
+name = "banapeel"
+path = "src/bin/cli.rs"
