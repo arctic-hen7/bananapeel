@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.1-rc.2](/home/arctic-hen7/me/.main-mirror.git/compare/v0.1.1-rc.1...v0.1.1-rc.2) (2023-12-19)
+
+
+### Bug Fixes
+
+* fixed binary name ([320b0ce](/home/arctic-hen7/me/.main-mirror.git/commit/320b0ce34b97a24ddb8f5e2c7c7e7882e54cf48d))
+
 ### [0.1.1-rc.1](/home/arctic-hen7/me/.main-mirror.git/compare/v0.1.0...v0.1.1-rc.1) (2023-12-19)
 
 
