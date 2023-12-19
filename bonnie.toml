@@ -6,6 +6,14 @@ min-js = [
     "uglifyjs bananapeel.js --mangle --mangle-props --output bananapeel.min.js",
     # Make sure to add the license as well, since this will probably be distributed as a rogue file
     "echo -e \"/*\n$(cat ./LICENSE)\n*/\n\n$(cat ./bananapeel.min.js)\" > bananapeel.min.js"
+    # 1076 characters + license
+]
+min-py = [
+    "pyminify bananapeel.py --rename-globals --output bananapeel.min.py",
+    "sed -i 's/key_str/k/g; s/partitions/p/g; s/inc/i/g; s/noise_len/n/g; s/base64_len/b/g; s/rng_init_seq/q/g; s/rng_init_state/r/g; s/state/s/g' bananapeel.min.py",
+    # Make sure to add the license as well, since this will probably be distributed as a rogue file
+    "echo -e \"'''\n$(cat ./LICENSE)\n'''\n\n$(cat ./bananapeel.min.py)\" > bananapeel.min.py"
+    # 738 characters + license
 ]
 
 release = [

@@ -1,70 +1,50 @@
 # A decoder for the BANANAPEEL algorithm that can run in Python. This is deliberately minimal, but it will decode any BANANAPEEL message produced
 # by a compliant encoder. Since this runs in an interpreted language, do NOT expect this to be fast!
+#
+# This code has deliberately been made extremely minimal and compressed.
 
+import sys
 import base64
 import struct
 
-def bp_decode(key_str, partitions):
-    # Convert the key string into an actual key
-    binary_key = base64.b64decode(key_str)
-    key = {
-        'rng_init_state': struct.unpack('<Q', binary_key[:8])[0],
-        'rng_init_seq': struct.unpack('<Q', binary_key[8:16])[0],
-        'base64_len': struct.unpack('<I', binary_key[16:20])[0],
-        'noise_len': struct.unpack('<I', binary_key[20:24])[0],
-    }
+# Read the partitions from stdin
+partitions = [line.strip() for line in sys.stdin.readlines()]
+# Unpack the key string into its components
+key = dict(zip(
+    ['rng_init_state', 'rng_init_seq', 'base64_len', 'noise_len'],
+    struct.unpack('<QQII', base64.b64decode(sys.argv[1])[:24])
+))
 
-    # Utility functions for taking moduli in the 64-bit and 32-bit integer ranges
-    def wrap64(x):
-        return x % (18446744073709551615 + 1)
+# Utility function to handle modulus operation for different integer ranges
+wrap = lambda x, limit: x % (limit + 1)
 
-    def wrap32(x):
-        return x % (4294967295 + 1)
+# Minimal PCG implementation with seeding
+def rng_next(rng):
+    oldstate = rng['state']
+    rng['state'] = wrap(oldstate * 6364136223846793005 + (rng['inc'] | 1), 18446744073709551615)
+    xorshifted = wrap(((oldstate >> 18) ^ oldstate) >> 27, 4294967295)
+    rot = wrap(oldstate >> 59, 4294967295)
+    return wrap((xorshifted >> rot) | (xorshifted << (-rot & 31)), 4294967295)
 
-    # Minimal PCG implementation with seeding
-    class RNG:
-        def __init__(self):
-            self.state = 0
-            self.inc = wrap64((key['rng_init_seq'] << 1) | 1)
+rng = {
+    'state': 0,
+    'inc': wrap(key['rng_init_seq'] << 1 | 1, 18446744073709551615)
+}
+rng_next(rng)
+rng['state'] = wrap(rng['state'] + key['rng_init_state'], 18446744073709551615)
+rng_next(rng)
 
-        def next(self):
-            oldstate = self.state
-            self.state = wrap64((oldstate * 6364136223846793005) + (self.inc | 1))
-            xorshifted = wrap32(((oldstate >> 18) ^ oldstate) >> 27)
-            rot = wrap32(oldstate >> 59)
-            return wrap32((xorshifted >> rot) | (xorshifted << ((-rot) & 31)))
+# Order and parse the partitions based on the RNG
+next_idx = 0
+while next_idx < len(partitions):
+    order_prefix = rng_next(rng)
+    formatted_order_prefix = f"{order_prefix:08x}"
+    for i in range(next_idx, len(partitions)):
+        if partitions[i].startswith(formatted_order_prefix):
+            data = partitions[i][len(formatted_order_prefix):][key['noise_len']:]
+            partitions[i], partitions[next_idx] = partitions[next_idx], partitions[i]
+            partitions[next_idx] = data
+            next_idx += 1
 
-    rng = RNG()
-    rng.next()
-    rng.state = wrap64(rng.state + key['rng_init_state'])
-    rng.next()
-
-    # Order and parse the partitions
-    next_idx = 0  # The next index to find
-    while next_idx < len(partitions):
-        order_prefix = rng.next()
-        formatted_order_prefix = format(order_prefix, '08x')
-        # NOTE: Not worth searching among those we've already parsed obviously
-        for i in range(next_idx, len(partitions)):
-            if partitions[i].startswith(formatted_order_prefix):
-                # Strip off the order prefix and the noise
-                data = partitions[i][len(formatted_order_prefix):]
-                data = data[key['noise_len']:]
-                partitions[i] = data
-                # Now move that partition to the index we want it at
-                partitions[i], partitions[next_idx] = partitions[next_idx], partitions[i]
-                next_idx += 1
-
-    # Reverse the hex encoding
-    hex_str = ''.join(partitions)
-    # If there are an odd number of characters, we padded, so get rid of the last character until we handle the padding properly
-    hex_str = hex_str[:-1] if len(hex_str) % 2 != 0 else hex_str
-
-    base64_bytes = bytes.fromhex(hex_str)
-    # Remove the base 64 padding added to make the chunks even
-    base64_unpadded = base64_bytes[:key['base64_len']]
-    # Decode the base 64
-    base64_unpadded_str = base64.urlsafe_b64decode(base64_unpadded)
-
-    # Python requires a base64 *bytes* in order to perform decoding (expects URL-safe)
-    return base64_unpadded_str.decode('utf-8')
+# Reconstruct the hex string from partitions and handle padding, then decode the base64 to retrieve the original string
+print(base64.urlsafe_b64decode(bytes.fromhex(''.join(partitions)[:-1] if len(''.join(partitions)) % 2 != 0 else ''.join(partitions))[:key['base64_len']]).decode('utf-8'))
