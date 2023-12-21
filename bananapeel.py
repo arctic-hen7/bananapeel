@@ -7,6 +7,9 @@ import sys
 import base64
 import struct
 
+PCG_MAGIC_MODULUS_1 = 18446744073709551615
+PCG_MAGIC_MODULUS_2 = 4294967295
+
 # Read the partitions from stdin
 partitions = [line.strip() for line in sys.stdin.readlines()]
 # Unpack the key string into its components
@@ -21,17 +24,17 @@ wrap = lambda x, limit: x % (limit + 1)
 # Minimal PCG implementation with seeding
 def rng_next(rng):
     oldstate = rng['state']
-    rng['state'] = wrap(oldstate * 6364136223846793005 + (rng['inc'] | 1), 18446744073709551615)
-    xorshifted = wrap(((oldstate >> 18) ^ oldstate) >> 27, 4294967295)
-    rot = wrap(oldstate >> 59, 4294967295)
-    return wrap((xorshifted >> rot) | (xorshifted << (-rot & 31)), 4294967295)
+    rng['state'] = wrap(oldstate * 6364136223846793005 + (rng['inc'] | 1), PCG_MAGIC_MODULUS_1)
+    xorshifted = wrap(((oldstate >> 18) ^ oldstate) >> 27, PCG_MAGIC_MODULUS_2)
+    rot = wrap(oldstate >> 59, PCG_MAGIC_MODULUS_2)
+    return wrap((xorshifted >> rot) | (xorshifted << (-rot & 31)), PCG_MAGIC_MODULUS_2)
 
 rng = {
     'state': 0,
-    'inc': wrap(key['rng_init_seq'] << 1 | 1, 18446744073709551615)
+    'inc': wrap(key['rng_init_seq'] << 1 | 1, PCG_MAGIC_MODULUS_1)
 }
 rng_next(rng)
-rng['state'] = wrap(rng['state'] + key['rng_init_state'], 18446744073709551615)
+rng['state'] = wrap(rng['state'] + key['rng_init_state'], PCG_MAGIC_MODULUS_1)
 rng_next(rng)
 
 # Order and parse the partitions based on the RNG

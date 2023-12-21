@@ -22,25 +22,27 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-P='i'
-O='n'
-N='b'
-M='q'
-L='r'
+R='i'
+Q='n'
+P='b'
+O='q'
+N='r'
 H=len
 E='s'
-import sys,base64 as J,struct as Q
+import sys,base64 as L,struct as S
+I=0xffffffffffffffff
+J=4294967295
 A=[A.strip()for A in sys.stdin.readlines()]
-F=dict(zip([L,M,N,O],Q.unpack('<QQII',J.b64decode(sys.argv[1])[:24])))
+F=dict(zip([N,O,P,Q],S.unpack('<QQII',L.b64decode(sys.argv[1])[:24])))
 B=lambda x,limit:x%(limit+1)
-def I(r):C=r;A=C[E];C[E]=B(A*0x5851f42d4c957f2d+(C[P]|1),0xffffffffffffffff);D=B((A>>18^A)>>27,4294967295);F=B(A>>59,4294967295);return B(D>>F|D<<(-F&31),4294967295)
-D={E:0,P:B(F[M]<<1|1,0xffffffffffffffff)}
-I(D)
-D[E]=B(D[E]+F[L],0xffffffffffffffff)
-I(D)
+def K(r):C=r;A=C[E];C[E]=B(A*0x5851f42d4c957f2d+(C[R]|1),I);D=B((A>>18^A)>>27,J);F=B(A>>59,J);return B(D>>F|D<<(-F&31),J)
+D={E:0,R:B(F[O]<<1|1,I)}
+K(D)
+D[E]=B(D[E]+F[N],I)
+K(D)
 C=0
 while C<H(A):
-	R=I(D);K=f"{R:08x}"
+	T=K(D);M=f"{T:08x}"
 	for G in range(C,H(A)):
-		if A[G].startswith(K):S=A[G][H(K):][F[O]:];A[G],A[C]=A[C],A[G];A[C]=S;C+=1
-print(J.urlsafe_b64decode(bytes.fromhex(''.join(A)[:-1]if H(''.join(A))%2!=0 else''.join(A))[:F[N]]).decode('utf-8'))
+		if A[G].startswith(M):U=A[G][H(M):][F[Q]:];A[G],A[C]=A[C],A[G];A[C]=U;C+=1
+print(L.urlsafe_b64decode(bytes.fromhex(''.join(A)[:-1]if H(''.join(A))%2!=0 else''.join(A))[:F[P]]).decode('utf-8'))
